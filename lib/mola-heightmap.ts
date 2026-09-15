@@ -23,19 +23,44 @@ export const loadMola4ppd = async (): Promise<MolaGrid> => {
   return { cols: COLS, rows: ROWS, elev }
 }
 
+const wrapCol = (col: number, cols: number) => {
+  return ((col % cols) + cols) % cols
+}
+
+const clampRow = (row: number, rows: number) => {
+  return Math.min(rows - 1, Math.max(0, row))
+}
+
+const elevAt = (grid: MolaGrid, row: number, col: number) => {
+  return grid.elev[clampRow(row, grid.rows) * grid.cols + wrapCol(col, grid.cols)] ?? 0
+}
+
 export const sampleMolaMetres = (
   grid: MolaGrid,
   latDeg: number,
   lonEastDeg: number,
 ) => {
   const east = ((lonEastDeg % 360) + 360) % 360
-  const col = Math.min(
-    grid.cols - 1,
-    Math.max(0, Math.round((east / 360) * grid.cols)),
-  )
-  const row = Math.min(
-    grid.rows - 1,
-    Math.max(0, Math.round(((90 - latDeg) / 180) * grid.rows)),
-  )
-  return grid.elev[row * grid.cols + col] ?? 0
+  const col = Math.round((east / 360) * grid.cols)
+  const row = Math.round(((90 - latDeg) / 180) * (grid.rows - 1))
+  return elevAt(grid, row, col)
+}
+
+export const sampleMolaBilinear = (
+  grid: MolaGrid,
+  latDeg: number,
+  lonEastDeg: number,
+) => {
+  const east = ((lonEastDeg % 360) + 360) % 360
+  const colF = (east / 360) * grid.cols
+  const rowF = ((90 - latDeg) / 180) * (grid.rows - 1)
+  const col0 = Math.floor(colF)
+  const row0 = Math.floor(rowF)
+  const tx = colF - col0
+  const ty = rowF - row0
+  const h00 = elevAt(grid, row0, col0)
+  const h10 = elevAt(grid, row0, col0 + 1)
+  const h01 = elevAt(grid, row0 + 1, col0)
+  const h11 = elevAt(grid, row0 + 1, col0 + 1)
+  return h00 * (1 - tx) * (1 - ty) + h10 * tx * (1 - ty) + h01 * (1 - tx) * ty + h11 * tx * ty
 }

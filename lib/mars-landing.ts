@@ -19,6 +19,37 @@ export type LandingPick = {
   siteId?: string
 }
 
+export type CustomSite = {
+  id: string
+  lat_deg: number
+  lon_east_deg: number
+}
+
+export const isCustomSiteId = (siteId?: string) => {
+  return Boolean(siteId?.startsWith("custom-") || siteId === "custom")
+}
+
+export const customSiteHref = (lat_deg: number, lon_east_deg: number) => {
+  const lat = lat_deg.toFixed(4)
+  const lon = lon_east_deg.toFixed(4)
+  return `/site/custom?lat=${lat}&lon=${lon}`
+}
+
+export const siteHref = (siteId: string, lat_deg?: number, lon_east_deg?: number) => {
+  if (isCustomSiteId(siteId) && lat_deg != null && lon_east_deg != null) {
+    return customSiteHref(lat_deg, lon_east_deg)
+  }
+  return `/site/${siteId}`
+}
+
+export const makeCustomSite = (lat_deg: number, lon_east_deg: number): CustomSite => {
+  return {
+    id: `custom-${Date.now()}`,
+    lat_deg,
+    lon_east_deg,
+  }
+}
+
 export const JEZERO: LandingPick = {
   lat_deg: 18.38,
   lon_east_deg: 77.58,
@@ -42,6 +73,21 @@ export const lonEastTo180 = (lonEast: number) => {
   return east > 180 ? east - 360 : east
 }
 
+export const vikingTileUrl = (lat: number, lonEast: number, level = 6) => {
+  const lon180 = lonEastTo180(lonEast)
+  const tilesX = 2 * 2 ** level
+  const tilesY = 2 ** level
+  const x = Math.min(
+    tilesX - 1,
+    Math.max(0, Math.floor(((lon180 + 180) / 360) * tilesX)),
+  )
+  const y = Math.min(
+    tilesY - 1,
+    Math.max(0, Math.floor(((90 - lat) / 180) * tilesY)),
+  )
+  return `https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/${level}/${y}/${x}.jpg`
+}
+
 export const lon180ToEast = (lon180: number) => {
   return ((lon180 % 360) + 360) % 360
 }
@@ -49,6 +95,14 @@ export const lon180ToEast = (lon180: number) => {
 export const latLonToUv = (lat: number, lonEast: number) => {
   const lon = ((lonEast % 360) + 360) % 360
   return { u: lon / 360, v: (lat + 90) / 180 }
+}
+
+export const shortSiteName = (name: string) => {
+  return name
+    .replace(" crater", "")
+    .replace(" Planitia", "")
+    .replace(" lava tubes", "")
+    .replace(" caves", "")
 }
 
 export const nearestSite = (
