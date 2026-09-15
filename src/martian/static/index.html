@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Martian Habitat Risk Classifier</title>
+    <style>
+      :root {
+        --bg: #1a0f0a;
+        --panel: #2a1710;
+        --accent: #ff6b3d;
+        --text: #f5e6dc;
+        --muted: #c9a892;
+        --safe: #2ecc71;
+        --warning: #f1c40f;
+        --critical: #e74c3c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: radial-gradient(circle at 30% 20%, #3a1c10, var(--bg));
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 32px 16px;
+      }
+      .wrap { width: 100%; max-width: 760px; }
+      h1 { font-size: 1.8rem; margin: 0 0 4px; }
+      p.sub { color: var(--muted); margin: 0 0 24px; }
+      .card {
+        background: var(--panel);
+        border: 1px solid #47281b;
+        border-radius: 14px;
+        padding: 24px;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+      }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+      label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+      input {
+        width: 100%; padding: 10px 12px; border-radius: 8px;
+        border: 1px solid #5a3423; background: #1f120c; color: var(--text); font-size: 1rem;
+      }
+      button {
+        margin-top: 22px; width: 100%; padding: 14px; font-size: 1.05rem; font-weight: 600;
+        color: #1a0f0a; background: var(--accent); border: none; border-radius: 10px; cursor: pointer;
+      }
+      button:hover { filter: brightness(1.08); }
+      #result { margin-top: 24px; display: none; }
+      .badge {
+        display: inline-block; padding: 8px 18px; border-radius: 999px;
+        font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 1.1rem;
+      }
+      .badge.safe { background: rgba(46,204,113,0.15); color: var(--safe); border: 1px solid var(--safe); }
+      .badge.warning { background: rgba(241,196,15,0.15); color: var(--warning); border: 1px solid var(--warning); }
+      .badge.critical { background: rgba(231,76,60,0.15); color: var(--critical); border: 1px solid var(--critical); }
+      .bars { margin-top: 18px; }
+      .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+      .bar-label { width: 80px; font-size: 0.85rem; color: var(--muted); text-transform: capitalize; }
+      .bar-track { flex: 1; background: #1f120c; border-radius: 6px; overflow: hidden; height: 18px; }
+      .bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+      .bar-fill.safe { background: var(--safe); }
+      .bar-fill.warning { background: var(--warning); }
+      .bar-fill.critical { background: var(--critical); }
+      .bar-val { width: 54px; text-align: right; font-variant-numeric: tabular-nums; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>🛰️ Martian Habitat Risk Classifier</h1>
+      <p class="sub">Enter life-support sensor readings to assess colony risk.</p>
+      <div class="card">
+        <div class="grid" id="form"></div>
+        <button id="predict">Assess risk</button>
+        <div id="result">
+          <div>Predicted risk: <span id="badge" class="badge"></span></div>
+          <div class="bars" id="bars"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const formEl = document.getElementById("form");
+      const resultEl = document.getElementById("result");
+      const badgeEl = document.getElementById("badge");
+      const barsEl = document.getElementById("bars");
+      let features = [];
+
+      async function loadSchema() {
+        const res = await fetch("/api/schema");
+        const data = await res.json();
+        features = data.features;
+        formEl.innerHTML = features
+          .map(
+            (f) => `
+            <div>
+              <label for="${f.name}">${f.label}</label>
+              <input id="${f.name}" type="number" step="any"
+                     value="${f.default}" min="${f.min}" max="${f.max}" />
+            </div>`
+          )
+          .join("");
+      }
+
+      async function predict() {
+        const payload = {};
+        for (const f of features) {
+          payload[f.name] = parseFloat(document.getElementById(f.name).value);
+        }
+        const res = await fetch("/api/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          alert("Prediction failed: " + res.status);
+          return;
+        }
+        const data = await res.json();
+        badgeEl.textContent = data.risk;
+        badgeEl.className = "badge " + data.risk;
+        const order = ["safe", "warning", "critical"];
+        barsEl.innerHTML = order
+          .map((cls) => {
+            const pct = ((data.probabilities[cls] || 0) * 100).toFixed(1);
+            return `
+              <div class="bar-row">
+                <div class="bar-label">${cls}</div>
+                <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+                <div class="bar-val">${pct}%</div>
+              </div>`;
+          })
+          .join("");
+        resultEl.style.display = "block";
+      }
+
+      document.getElementById("predict").addEventListener("click", predict);
+      loadSchema();
+    </script>
+  </body>
+</html>
