@@ -61,6 +61,35 @@ switched from the power budget to rock throughput, so the fix is a richer
 deposit or a bigger mining fleet, not more reactors. The tool detects this and
 says so instead of reporting a dead end.
 
+## The 3D views
+
+Both are generated from the simulation, not modelled by hand.
+
+**The globe** drapes the model's predicted water field over Mars' real
+topography, so the wet mid-latitude mantling bands the regressor learned to
+find are visible as a physical feature of the planet rather than a number in a
+table. Candidate sites stand off the surface as pins, green where they are
+viable at the current crew size and red where they are not. Topographic
+exaggeration is adjustable, because Mars' full 30 km of relief is invisible
+against a 3,390 km radius at true scale.
+
+**The settlement plan** is dimensioned in metres from the sizing result for the
+selected site and crew size:
+
+| Feature | Where the geometry comes from |
+|---|---|
+| Solar farm footprint | the computed array area, in m², laid out as tilted rows |
+| Habitat domes | 60 m³ of pressurised volume per person in 12 m hemispheres |
+| Fission units | the reactor count in the current configuration |
+| Open-pit mine | one launch window of excavation at 1,600 kg/m³ bulk density |
+| Excavator fleet | the rock throughput the predicted ore grade demands |
+
+The mine is the part worth pointing at during a demo: it is the machine
+learning output made physical. Holding the crew at 100 and changing only the
+predicted water content from 25 wt% to 2 wt% grows the pit from a 21 m radius
+to 48 m, because forty times more rock has to be heated for the same litres of
+water. Move the population slider and the whole base is rebuilt.
+
 ## Running it
 
 ```bash
@@ -185,9 +214,10 @@ marswater/
   model.py       the one learned component, with baselines and uncertainty
   simulate.py    infrastructure sizing, ranking, breakpoints, storm scenarios
   pipeline.py    train, then score every candidate site
+  globe.py       3D globe and simulation-driven settlement plan
   cli.py         headless end-to-end demo
 app.py           Streamlit dashboard
-tests/           102 tests covering physics, model, simulation and dashboard
+tests/           120 tests covering physics, model, simulation, 3D and dashboard
 ```
 
 ## Honest limitations

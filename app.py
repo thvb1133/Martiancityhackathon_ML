@@ -15,6 +15,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from marswater import constants as C
+from marswater.globe import settlement_plan, water_globe
 from marswater.physics import settlement_demand
 from marswater.pipeline import run_pipeline
 from marswater.simulate import (
@@ -28,6 +29,10 @@ from marswater.simulate import (
 )
 
 MARS_COLOURS = ["#2b1a14", "#7a2f1a", "#c4562a", "#e08a4a", "#8fd3e0", "#d6f2f7"]
+
+DOME_VOLUME_NOTE = (
+    "Sized from 60 m³ of pressurised volume per person in 12 m hemispheres."
+)
 
 st.set_page_config(
     page_title="MARSWATER -- Mars settlement siting",
@@ -144,62 +149,84 @@ st.caption(
 )
 
 grid = result.grid
-fig = go.Figure()
-fig.add_trace(
-    go.Scattergl(
-        x=grid["longitude_deg"], y=grid["latitude_deg"],
-        mode="markers",
-        marker=dict(
-            size=9, symbol="square",
-            color=grid["predicted_weh_wt_pct"],
-            colorscale=[[i / (len(MARS_COLOURS) - 1), c]
-                        for i, c in enumerate(MARS_COLOURS)],
-            colorbar=dict(title="wt% H2O"), cmin=0, cmax=30,
-        ),
-        hovertemplate=(
-            "%{y:.0f}N %{x:.0f}E<br>predicted %{marker.color:.1f} wt%<extra></extra>"
-        ),
-        name="model prediction",
+globe_tab, flat_tab = st.tabs(["Globe (3D)", "Flat map"])
+
+with globe_tab:
+    exaggeration = st.slider(
+        "Topographic exaggeration", 0, 80, 30, step=5,
+        help="Mars' full relief is about 30 km against a 3,390 km radius, so "
+             "true-scale topography is invisible on a globe. Set this to zero "
+             "for a perfect sphere.",
     )
-)
-site_labels = ranked.merge(
-    result.named_sites[["name", "note"]], on="name", how="left"
-)
-fig.add_trace(
-    go.Scattergl(
-        x=site_labels["longitude_deg"], y=site_labels["latitude_deg"],
-        mode="markers+text",
-        marker=dict(
-            size=14,
-            color=["#39ff88" if f else "#ff4b4b" for f in site_labels["feasible"]],
-            line=dict(color="white", width=1.5), symbol="diamond",
-        ),
-        text=site_labels["name"], textposition="top center",
-        textfont=dict(size=9, color="white"),
-        customdata=site_labels[
-            ["water_grade_wt_pct", "landed_mass_t", "limiting_factor", "note"]
-        ],
-        hovertemplate=(
-            "<b>%{text}</b><br>%{customdata[3]}<br>"
-            "water %{customdata[0]:.1f} wt%<br>"
-            "landed mass %{customdata[1]:.0f} t<br>"
-            "%{customdata[2]}<extra></extra>"
-        ),
-        name="candidate sites",
+    st.plotly_chart(
+        water_globe(grid, ranked, elevation_exaggeration=float(exaggeration)),
+        use_container_width=True,
     )
-)
-fig.update_layout(
-    height=520, template="plotly_dark",
-    xaxis=dict(title="longitude (deg E)", range=[-180, 180]),
-    yaxis=dict(title="latitude (deg N)", range=[-75, 75]),
-    margin=dict(l=0, r=0, t=10, b=0), showlegend=False,
-)
-st.plotly_chart(fig, use_container_width=True)
-st.caption(
-    "Green diamonds are viable at the current population; red are not. "
-    "The wet mid-latitude bands are the mantling deposits the model learned to "
-    "find; the equatorial belt is dry."
-)
+    st.caption(
+        "Rotate and zoom with the mouse. Colour is the model's predicted water "
+        "content, draped over Mars' topography; the pale bands either side of "
+        "the equator are the mantling deposits the regressor learned to find. "
+        "Pins are candidate sites — green is viable at the current crew size, "
+        "red is not."
+    )
+
+with flat_tab:
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scattergl(
+            x=grid["longitude_deg"], y=grid["latitude_deg"],
+            mode="markers",
+            marker=dict(
+                size=9, symbol="square",
+                color=grid["predicted_weh_wt_pct"],
+                colorscale=[[i / (len(MARS_COLOURS) - 1), c]
+                            for i, c in enumerate(MARS_COLOURS)],
+                colorbar=dict(title="wt% H2O"), cmin=0, cmax=30,
+            ),
+            hovertemplate=(
+                "%{y:.0f}N %{x:.0f}E<br>predicted %{marker.color:.1f} wt%<extra></extra>"
+            ),
+            name="model prediction",
+        )
+    )
+    site_labels = ranked.merge(
+        result.named_sites[["name", "note"]], on="name", how="left"
+    )
+    fig.add_trace(
+        go.Scattergl(
+            x=site_labels["longitude_deg"], y=site_labels["latitude_deg"],
+            mode="markers+text",
+            marker=dict(
+                size=14,
+                color=["#39ff88" if f else "#ff4b4b" for f in site_labels["feasible"]],
+                line=dict(color="white", width=1.5), symbol="diamond",
+            ),
+            text=site_labels["name"], textposition="top center",
+            textfont=dict(size=9, color="white"),
+            customdata=site_labels[
+                ["water_grade_wt_pct", "landed_mass_t", "limiting_factor", "note"]
+            ],
+            hovertemplate=(
+                "<b>%{text}</b><br>%{customdata[3]}<br>"
+                "water %{customdata[0]:.1f} wt%<br>"
+                "landed mass %{customdata[1]:.0f} t<br>"
+                "%{customdata[2]}<extra></extra>"
+            ),
+            name="candidate sites",
+        )
+    )
+    fig.update_layout(
+        height=520, template="plotly_dark",
+        xaxis=dict(title="longitude (deg E)", range=[-180, 180]),
+        yaxis=dict(title="latitude (deg N)", range=[-75, 75]),
+        margin=dict(l=0, r=0, t=10, b=0), showlegend=False,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(
+        "Green diamonds are viable at the current population; red are not. "
+        "The wet mid-latitude bands are the mantling deposits the model learned to "
+        "find; the equatorial belt is dry."
+    )
 
 st.divider()
 
@@ -269,6 +296,51 @@ with right:
         )
 
 st.divider()
+
+# ---------------------------------------------------------------------------
+# Settlement plan, generated from the sizing result
+# ---------------------------------------------------------------------------
+if infra is not None:
+    st.subheader("The settlement this implies, to scale")
+    st.caption(
+        "Not a concept drawing. Every dimension below is computed from the "
+        "sizing result for this site and crew size, so moving the population "
+        "slider rebuilds the base."
+    )
+    plan_figure, derived = settlement_plan(infra, best["name"])
+    st.plotly_chart(plan_figure, use_container_width=True)
+
+    plan_cols = st.columns(4)
+    plan_cols[0].metric(
+        "Solar farm", f"{derived['array_side_m']:,.0f} m square",
+        help=f"{derived['array_area_m2']:,.0f} m² of collector, drawn as "
+             f"{derived['panel_rows_drawn']:.0f} tilted rows.",
+    )
+    plan_cols[1].metric(
+        "Habitat domes", f"{derived['domes_needed']:,.0f}",
+        help=f"{DOME_VOLUME_NOTE} That is about "
+             f"{derived['crew_per_dome']:.0f} crew per dome."
+             + ("" if derived["domes_needed"] <= derived["domes_drawn"]
+                else f" Showing {derived['domes_drawn']:.0f} for clarity."),
+    )
+    plan_cols[2].metric(
+        "Open-pit mine", f"{derived['pit_radius_m']:,.0f} m radius",
+        help=f"{derived['regolith_m3_per_sol']:,.0f} m³ of regolith per sol, "
+             f"or {derived['excavated_m3_per_synod']:,.0f} m³ excavated over one "
+             "launch window at 1,600 kg/m³ bulk density.",
+    )
+    plan_cols[3].metric(
+        "Excavators", f"{infra.excavator_units}",
+        help=f"Each unit moves {C.EXCAVATOR_UNIT_THROUGHPUT_KG_PER_SOL / 1000:,.0f}"
+             f" t of rock per sol. Fleet limit is {config.max_excavator_fleet}.",
+    )
+    st.caption(
+        "The mine is the part that scales with the model's prediction: richer "
+        "ground means a smaller pit and fewer excavators for the same litres "
+        "of water, because less rock has to be heated to release it."
+    )
+
+    st.divider()
 
 # ---------------------------------------------------------------------------
 # The two arguments that make the model load bearing

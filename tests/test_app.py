@@ -21,15 +21,32 @@ APP = str(Path(__file__).resolve().parent.parent / "app.py")
 TIMEOUT_S = 300  # the first run trains the model
 
 
-def run_app(**widget_values) -> AppTest:
+def widget_by_label(elements, label: str):
+    """Find a widget by its label.
+
+    Positional lookup is brittle: AppTest orders widgets by their position in
+    the element tree, not by the order they appear in the source, so adding a
+    control to the main body silently renumbers the sidebar.
+    """
+    for element in elements:
+        if label in element.label:
+            return element
+    raise AssertionError(
+        f"no widget labelled {label!r}; found {[e.label for e in elements]}"
+    )
+
+
+def run_app(population: int | None = None, propellant: bool | None = None) -> AppTest:
     app = AppTest.from_file(APP, default_timeout=TIMEOUT_S)
     app.run()
-    for key, value in widget_values.items():
-        if key == "population":
-            app.slider[0].set_value(value)
-        elif key == "include_propellant":
-            app.checkbox[0].set_value(value)
-    if widget_values:
+    changed = False
+    if population is not None:
+        widget_by_label(app.slider, "Settlement population").set_value(population)
+        changed = True
+    if propellant is not None:
+        widget_by_label(app.checkbox, "return propellant").set_value(propellant)
+        changed = True
+    if changed:
         app.run()
     return app
 
@@ -68,14 +85,24 @@ class TestDashboardLoads:
 
 
 class TestDashboardInteractions:
-    def test_survives_a_population_with_no_viable_site(self):
-        """The unhappy path must not raise on unguarded references."""
+    def test_reports_the_breakpoint_at_a_large_population(self):
+        """At 4,000 crew nothing is viable, and the app has to say why."""
         app = run_app(population=4000)
         assert_clean(app)
-        assert any("No shortlisted site supports" in e.value for e in app.error)
+        messages = [w.value for w in app.warning] + [e.value for e in app.error]
+        assert any("rock throughput" in m or "no shortlisted site" in m.lower()
+                   for m in messages), messages
 
     def test_survives_the_smallest_outpost(self):
+        """The unhappy paths must not raise on unguarded references."""
         assert_clean(run_app(population=10))
 
     def test_survives_disabling_propellant_production(self):
-        assert_clean(run_app(include_propellant=False))
+        assert_clean(run_app(propellant=False))
+
+    def test_three_dimensional_views_are_rendered(self, default_app):
+        headings = " ".join(h.value for h in default_app.subheader)
+        assert "settlement this implies" in headings
+        assert widget_by_label(
+            default_app.slider, "Topographic exaggeration"
+        ) is not None

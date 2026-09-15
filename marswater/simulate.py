@@ -84,6 +84,7 @@ class Infrastructure:
     pv_mass_kg: float
     battery_capacity_kwh: float
     battery_mass_kg: float
+    fission_units: int
     fission_mass_kg: float
 
     water_makeup_kg_per_sol: float
@@ -247,6 +248,7 @@ def size_infrastructure(
         pv_mass_kg=pv_area * C.PV_AREAL_MASS_KG_M2,
         battery_capacity_kwh=battery_kwh,
         battery_mass_kg=battery_mass,
+        fission_units=config.fission_units,
         fission_mass_kg=config.fission_units * C.FISSION_UNIT_MASS_KG,
         water_makeup_kg_per_sol=demand.water_makeup_kg,
         water_life_support_kg_per_sol=demand.water_life_support_kg,
