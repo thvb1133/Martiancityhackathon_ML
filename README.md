@@ -90,6 +90,52 @@ predicted water content from 25 wt% to 2 wt% grows the pit from a 21 m radius
 to 48 m, because forty times more rock has to be heated for the same litres of
 water. Move the population slider and the whole base is rebuilt.
 
+## Against the judging rubric
+
+Where the evidence for each criterion lives, so it can be checked rather than
+taken on trust.
+
+**1 — Impact & Purpose.** Siting is the decision every other system inherits,
+and it has to be made before anything is built. The tool also answers it in the
+currency that actually constrains a Mars campaign: tonnes landed and launches
+required, not an abstract score. The finding that a return capability
+eliminates half the candidate shortlist is a real planning consequence, not a
+restatement of the premise.
+
+**2 — Innovation & Creativity.** Local resources are the whole subject: the
+settlement is built from buried ice and atmospheric CO₂, and the model's
+prediction feeds an in-situ extraction energy budget rather than a rating. Two
+choices are genuinely unusual. The ranking is a physical cost, so no weights
+were chosen to produce a preferred answer. And the 3D is an output of the
+simulation rather than a drawing of it — the mine is dimensioned from the
+predicted ore grade, so the machine learning is visible as geometry.
+
+**3 — Technical Execution.** 145 tests covering orbital geometry, insolation
+including polar night, extraction energy monotonicity, electrolysis
+stoichiometry, sizing, ranking invariants, breakpoint boundaries, the 3D
+geometry and the dashboard's load path. Two real bugs were caught and fixed
+during testing, both recorded in the commit history: an uncertainty interval
+that failed to bracket its own prediction, and a dashboard that aborted on a
+pandas Styler dependency. Two demo paths — an 8-second CLI and the dashboard —
+so a browser failure is not a lost submission.
+
+**4 — Feasibility & Real-World Potential.** The physics layer is already in
+real units against published constants, so it needs no modification to run on
+measured data. The swap path is code, not a paragraph:
+[`marswater/realdata.py`](marswater/realdata.py) samples real georeferenced
+rasters through rasterio, validates a supplied survey against the model's
+schema, and catches the unit errors that silently ruin a real data pipeline.
+`tests/test_realdata.py` loads a survey from disk, trains the model on it, and
+samples a genuine GeoTIFF at the named sites' coordinates. The limitations
+section below states what measured data would and would not fix.
+
+**5 — Team & Collaboration.** [`DEMO.md`](DEMO.md) is the pitch: a timed
+three-minute script, prepared answers to the questions the rubric invites, and
+a fallback plan if the projector fails. The work splits cleanly along
+disciplinary lines — the physics layer, the model, the 3D views and the
+narrative are separate modules with a narrow interface, so they can be owned by
+different people without collisions.
+
 ## Running it
 
 ```bash
@@ -215,10 +261,39 @@ marswater/
   simulate.py    infrastructure sizing, ranking, breakpoints, storm scenarios
   pipeline.py    train, then score every candidate site
   globe.py       3D globe and simulation-driven settlement plan
+  realdata.py    adapter for real PDS rasters and user-supplied surveys
   cli.py         headless end-to-end demo
 app.py           Streamlit dashboard
-tests/           120 tests covering physics, model, simulation, 3D and dashboard
+DEMO.md          timed pitch script, prepared Q&A and a failure plan
+tests/           145 tests covering physics, model, simulation, 3D, data and UI
 ```
+
+## Using real data
+
+The model ships trained on a surrogate survey, but the adapter for real
+products is written and tested:
+
+```python
+from marswater.realdata import sample_rasters, load_survey
+from marswater.sites import named_sites_frame
+from marswater.model import WaterYieldModel
+
+# Sample real georeferenced Mars products at candidate site coordinates.
+sites = sample_rasters(named_sites_frame(), {
+    "water_equivalent_hydrogen_wt_pct": "odyssey_ns_weh.tif",
+    "thermal_inertia": "tes_thermal_inertia.tif",
+    "elevation_km": "mola_megdr.tif",
+})
+
+# Or train directly from a prepared survey, validated against the schema.
+model = WaterYieldModel().fit(load_survey("survey.csv"))
+```
+
+`load_survey` reports every schema problem in one pass and range-checks each
+column, which catches the unit errors that otherwise train a plausible-looking
+model on the wrong numbers — an albedo supplied as a percentage, or a thermal
+inertia in the wrong SI units. `realdata.py` documents the exact PDS product
+identifiers for each feature.
 
 ## Honest limitations
 

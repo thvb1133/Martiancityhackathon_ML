@@ -6,5 +6,11 @@ scikit-learn>=1.4,<2
 streamlit>=1.32,<2
 plotly>=5.19,<7
 
+# Optional. Only needed to sample real georeferenced Mars rasters through
+# marswater.realdata.sample_rasters; the dashboard and CLI run without it.
+# Left out of the default install because its binary dependencies are heavy
+# and a failed wheel build should not take the whole app down with it.
+#   pip install rasterio
+
 # Development only (tests):
 #   pip install pytest
