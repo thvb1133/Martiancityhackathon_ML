@@ -408,18 +408,20 @@ def mission_architecture_comparison(
     target_population: int = 100,
     grade_column: str = "predicted_weh_lower_wt_pct",
 ) -> pd.DataFrame:
-    """Does the settlement intend to send anyone home, and does that move it?
+    """Does the settlement intend to send anyone home, and what does that cost?
 
     A one-way outpost only has to keep its crew alive, and a closed ECLSS makes
-    that a small water demand -- so the siting decision is won on sunlight, and
-    the best site is a dry, high-elevation one near the equator. The moment the
-    settlement commits to a return capability, propellant dwarfs the crew's
-    water demand by an order of magnitude, and the decision is won on ice
-    instead. The recommended landing site changes accordingly.
+    that a small water demand, so a dry site stays competitive: on these
+    assumptions the driest site on the shortlist still places third. The moment
+    the settlement commits to a return capability, propellant dwarfs the crew's
+    water demand by an order of magnitude. Landed mass roughly doubles at the
+    same crew size, the dry sites drop out of contention, and past a few
+    hundred people half the shortlist stops qualifying at all.
 
-    This is the clearest demonstration that the water prediction is load
-    bearing: hold everything else fixed, change only whether vehicles depart,
-    and the model's output reorders the answer.
+    What does *not* happen is a change of winner. The best site is ice-rich
+    either way, which is worth saying plainly rather than dressing the result
+    up: the water prediction decides how many sites remain open and what they
+    cost, not which one goes first.
     """
     rows = []
     for label, propellant in (

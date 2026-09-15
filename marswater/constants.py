@@ -12,6 +12,8 @@ MARS_SEMI_MAJOR_AXIS_AU = 1.523679
 MARS_ECCENTRICITY = 0.0934
 MARS_OBLIQUITY_DEG = 25.19
 SOL_LENGTH_S = 88775.244  # mean solar day on Mars
+MARS_YEAR_SOLS = 668.59  # sols in one Mars orbit
+MARS_SURFACE_GRAVITY_M_S2 = 3.7207
 
 # Mean top-of-atmosphere irradiance at Mars' semi-major axis.
 MARS_MEAN_IRRADIANCE_W_M2 = SOLAR_CONSTANT_1AU_W_M2 / MARS_SEMI_MAJOR_AXIS_AU**2
@@ -69,7 +71,10 @@ GREENHOUSE_KWH_PER_KG_FOOD = 27.0
 # to 600 t of mined water per departing vehicle.
 PROPELLANT_WATER_KG_PER_LAUNCH = 600_000.0
 PROPELLANT_PLANT_KWH_PER_KG_WATER = 5.3  # electrolysis, Sabatier, liquefaction
-SYNOD_SOLS = 668.0  # Earth-Mars launch windows are ~26 months apart
+# The Earth-Mars synodic period is about 780 Earth days, which is 759 sols.
+# That is the planning period for everything here: a launch window's worth of
+# propellant, and the time available to excavate before the next crew arrives.
+SYNOD_SOLS = 759.0
 DEFAULT_CREW_PER_RETURN_FLIGHT = 50.0
 
 # --- Landed hardware mass -------------------------------------------------
@@ -88,6 +93,80 @@ EXCAVATOR_UNIT_MASS_KG = 1400.0
 # mass roughly every 1.25 sols.
 PROCESSING_PLANT_MASS_KG_PER_KG_SOL = 0.8
 STARSHIP_PAYLOAD_KG = 100_000.0  # advertised Mars-surface payload
+
+# --- Regolith as a building material -------------------------------------
+# Dry Martian regolith is a loose, weak, superbly insulating sand. Fill its
+# pore space with ice and it becomes a dense, strong, thermally conductive
+# rock. Both transitions matter for underground architecture, and both are
+# driven by the one quantity this project predicts, so the water map is also a
+# map of what the ground can be asked to carry.
+REGOLITH_DRY_BULK_DENSITY_KG_M3 = 1600.0  # loose, as delivered by an excavator
+REGOLITH_POROSITY = 0.45  # InSight and lander-scale estimates
+# Water content at which pore ice fills the available void space. Beyond this
+# the ground is ice with rock in it rather than ice-cemented regolith.
+PORE_ICE_SATURATION_WT_PCT = 20.0
+# Below a few weight percent the ice sits in isolated pore necks and bridges
+# nothing, so it adds no strength. Cementation is a percolation threshold.
+ICE_CEMENT_ONSET_WT_PCT = 4.0
+
+# Cohesion. Dry regolith is a few kPa (Curiosity wheel-soil interaction,
+# InSight mole penetration). Ice-cemented regolith is measured in MPa: the
+# Phoenix lander could not scrape through it with a powered rasp.
+REGOLITH_DRY_COHESION_KPA = 8.0
+ICE_CEMENTED_COHESION_KPA = 2500.0
+# Soft-ground tunnelling stability number, overburden stress over cohesion.
+# Unsupported openings stand below roughly 4-6 (Broms & Bennermark 1967); 4 is
+# the conservative end, which is the right end for a habitat roof.
+TUNNEL_STABILITY_NUMBER = 4.0
+REGOLITH_ANGLE_OF_REPOSE_DEG = 30.0
+
+# Thermal conductivity. Dry regolith under Martian pressure conducts about as
+# well as a vacuum flask; pore ice raises it by a factor of sixty.
+REGOLITH_DRY_CONDUCTIVITY_W_M_K = 0.030
+ICE_CEMENTED_CONDUCTIVITY_W_M_K = 1.80
+ICE_SPECIFIC_HEAT_J_KG_K = 1900.0
+
+# --- Radiation ------------------------------------------------------------
+# Curiosity's RAD instrument measured roughly 0.21 mSv/sol of galactic cosmic
+# ray dose equivalent at the surface of Gale crater, or about 230 mSv per
+# Earth year. For comparison: terrestrial background is 2.4 mSv/yr and NASA's
+# career limit is of order 600 mSv.
+GCR_SURFACE_DOSE_MSV_PER_YEAR = 230.0
+# Dose equivalent through regolith is modelled as primary attenuation plus a
+# secondary-particle buildup term. The buildup is the reason thin shielding is
+# close to useless: charged primaries stopping in the first few tens of
+# g/cm^2 produce a neutron shower that replaces the dose they removed.
+GCR_PRIMARY_ATTENUATION_G_CM2 = 130.0
+GCR_SECONDARY_AMPLITUDE = 0.55
+GCR_SECONDARY_ATTENUATION_G_CM2 = 45.0
+# Design limit for a permanent settlement, not a short expedition: this is a
+# place people live, so the target is nearer terrestrial occupational limits
+# than an astronaut career allowance.
+DOSE_LIMIT_MSV_PER_YEAR = 50.0
+
+# --- Pressure vessel and habitat fit-out ---------------------------------
+HABITAT_PRESSURE_KPA = 55.0  # ISS-heritage reduced pressure, 34% O2
+HABITAT_INTERIOR_TEMP_K = 295.0
+PRESSURE_SHELL_ALLOWABLE_STRESS_PA = 120e6  # Al-Li 2195, working stress
+PRESSURE_SHELL_DENSITY_KG_M3 = 2700.0
+PRESSURE_SHELL_SAFETY_FACTOR = 2.0
+# Minimum gauge a shell can be built and handled in regardless of pressure.
+PRESSURE_SHELL_MIN_GAUGE_M = 0.0012
+GAS_TIGHT_LINER_KG_M2 = 3.0  # welded membrane plus redundant bladder
+INSULATION_CONDUCTIVITY_W_M_K = 0.020  # aerogel blanket
+INSULATION_DENSITY_KG_M3 = 100.0
+# Conducted loss into the surrounding ground. On Mars rejecting waste heat is
+# harder than generating it, so this is a heat-rejection path rather than a
+# loss -- but it still has to be bounded, or the habitat freezes its own
+# foundations' worth of power away.
+HABITAT_GROUND_LOSS_BUDGET_KW = 30.0
+# Warmest the regolith-liner interface may run at an ice-cemented site. Above
+# this the cement the vault is relying on for strength begins to go.
+ICE_STABILITY_INTERFACE_TEMP_K = 263.0
+# Sintering regolith into ground support trades landed mass for power: no ribs
+# are flown, but every kilogram of liner has to be heated to about 1,400 K.
+SINTERED_SUPPORT_THICKNESS_M = 0.30
+SINTER_ENERGY_KWH_PER_KG = 0.40
 
 # --- Site engineering limits ---------------------------------------------
 MAX_LANDING_SLOPE_DEG = 15.0  # EDL and surface-mobility limit

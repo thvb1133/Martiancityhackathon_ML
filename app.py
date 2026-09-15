@@ -349,9 +349,11 @@ st.subheader("Does the water prediction actually change the decision?")
 st.caption(
     "Hold every other assumption fixed and change only whether the settlement "
     "intends to send people home. A one-way outpost recycles nearly all its "
-    "water and is sited on sunlight. A settlement with a return vehicle has to "
-    "electrolyse hundreds of tonnes of mined water per departure, so it is "
-    "sited on ice -- and half the shortlist stops qualifying."
+    "water, so even a dry site stays competitive. A settlement with a return "
+    "vehicle has to electrolyse hundreds of tonnes of mined water per "
+    "departure: landed mass roughly doubles, the dry sites fall out of "
+    "contention, and past a few hundred people half the shortlist stops "
+    "qualifying at all."
 )
 st.dataframe(
     mission_architecture_comparison(result.named_sites, config, population),

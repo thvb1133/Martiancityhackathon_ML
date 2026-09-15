@@ -254,9 +254,27 @@ class TestSweepsAndScenarios:
             comparison["water_t_per_sol"].iloc[0]
         )
 
-    def test_return_capability_shortens_the_shortlist(self, pipeline, config):
+    def test_return_capability_roughly_doubles_the_hardware(
+        self, pipeline, config
+    ):
         comparison = mission_architecture_comparison(
             pipeline.named_sites, config, 100
+        )
+        one_way = comparison["landed_mass_t"].iloc[0]
+        with_return = comparison["landed_mass_t"].iloc[1]
+        assert with_return > 1.5 * one_way
+
+    def test_return_capability_shortens_the_shortlist_as_the_crew_grows(
+        self, pipeline, config
+    ):
+        """A return vehicle does not change the best site, it removes options.
+
+        At a small outpost every shortlisted site can fuel a departure. As the
+        crew grows the propellant demand grows with it, and the drier half of
+        the shortlist stops qualifying while the ice-rich half carries on.
+        """
+        comparison = mission_architecture_comparison(
+            pipeline.named_sites, config, 300
         )
         assert comparison["sites_viable"].iloc[1] < (
             comparison["sites_viable"].iloc[0]
