@@ -218,20 +218,17 @@ with left:
         "rank", "name", "latitude_deg", "water_grade_wt_pct",
         "regolith_t_per_sol", "pv_area_km2", "landed_mass_t",
         "max_population", "feasible", "limiting_factor",
-    ]].rename(columns={
+    ]].round({
+        "latitude_deg": 1, "water_grade_wt_pct": 1, "regolith_t_per_sol": 1,
+        "pv_area_km2": 3, "landed_mass_t": 0,
+    }).rename(columns={
         "rank": "#", "name": "site", "latitude_deg": "lat",
         "water_grade_wt_pct": "water wt%", "regolith_t_per_sol": "rock t/sol",
         "pv_area_km2": "array km2", "landed_mass_t": "mass t",
         "max_population": "ceiling", "feasible": "viable",
         "limiting_factor": "binding constraint",
     })
-    st.dataframe(
-        display.style.format({
-            "lat": "{:.1f}", "water wt%": "{:.1f}", "rock t/sol": "{:.1f}",
-            "array km2": "{:.3f}", "mass t": "{:.0f}", "ceiling": "{:,.0f}",
-        }),
-        hide_index=True, use_container_width=True, height=420,
-    )
+    st.dataframe(display, hide_index=True, use_container_width=True, height=420)
 
 with right:
     if infra is not None:

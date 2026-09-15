@@ -187,7 +187,7 @@ marswater/
   pipeline.py    train, then score every candidate site
   cli.py         headless end-to-end demo
 app.py           Streamlit dashboard
-tests/           94 tests covering physics, model and simulation
+tests/           102 tests covering physics, model, simulation and dashboard
 ```
 
 ## Honest limitations
