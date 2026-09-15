@@ -56,9 +56,44 @@ def water_globe(
     invisible on a globe; the default makes Tharsis and Hellas readable while
     keeping the sphere recognisable.
     """
+    return field_globe(
+        grid,
+        value_column="predicted_weh_wt_pct",
+        colourscale=WATER_COLOURSCALE,
+        cmin=0.0,
+        cmax=30.0,
+        colorbar_title="wt% H₂O",
+        hovertemplate="predicted %{surfacecolor:.1f} wt%<extra></extra>",
+        trace_name="predicted water",
+        ranked=ranked,
+        elevation_exaggeration=elevation_exaggeration,
+        label_top_n=label_top_n,
+    )
+
+
+def field_globe(
+    grid: pd.DataFrame,
+    value_column: str,
+    colourscale,
+    cmin: float,
+    cmax: float,
+    colorbar_title: str,
+    hovertemplate: str,
+    trace_name: str,
+    ranked: pd.DataFrame | None = None,
+    elevation_exaggeration: float = 30.0,
+    label_top_n: int = 6,
+) -> go.Figure:
+    """Drape any per-cell field over Mars' topography as a rotatable globe.
+
+    Factored out of ``water_globe`` so that a second derived quantity -- how
+    deep the ground at each cell could be mined without support -- can be shown
+    on the same sphere with the same seam closing and polar capping, rather
+    than a second nearly identical implementation.
+    """
     water = grid.pivot_table(
         index="latitude_deg", columns="longitude_deg",
-        values="predicted_weh_wt_pct", aggfunc="mean",
+        values=value_column, aggfunc="mean",
     )
     elevation = grid.pivot_table(
         index="latitude_deg", columns="longitude_deg",
@@ -96,11 +131,11 @@ def water_globe(
         go.Surface(
             x=x, y=y, z=z,
             surfacecolor=water_values,
-            colorscale=WATER_COLOURSCALE, cmin=0.0, cmax=30.0,
-            colorbar=dict(title="wt% H₂O", len=0.7, thickness=14),
+            colorscale=colourscale, cmin=cmin, cmax=cmax,
+            colorbar=dict(title=colorbar_title, len=0.7, thickness=14),
             lighting=dict(ambient=0.62, diffuse=0.85, specular=0.12, roughness=0.92),
-            hovertemplate="predicted %{surfacecolor:.1f} wt%<extra></extra>",
-            name="predicted water",
+            hovertemplate=hovertemplate,
+            name=trace_name,
         )
     )
 

@@ -958,13 +958,31 @@ def design_habitat(
     diurnal, annual, mean_temp = site_thermal_context(site, config)
     name = str(site.get("name", "unnamed"))
 
+    # Radiation and thermal stability both impose a minimum depth that no
+    # construction method can talk its way out of, so the sweep starts there
+    # instead of costing hundreds of options that cannot be built. This is a
+    # pruning of the search, not an approximation of it: every depth removed is
+    # one the verdict would have rejected anyway.
+    floor_m = max(
+        depth_for_dose_m(config.dose_limit_msv_per_year, grade),
+        depth_for_thermal_stability_m(
+            grade, diurnal, annual, config.temperature_swing_tolerance_k
+        ),
+    )
+    depths = config.candidate_depths_m
+    pruned = depths[depths >= floor_m - config.depth_step_m]
+    # When the floor is deeper than the deepest depth considered, nothing is
+    # buildable. Keep the full range so the returned design still carries a
+    # useful explanation of why.
+    depths = pruned if pruned.size else depths
+
     options = [
         evaluate_option(
             name, population, grade, method, float(depth),
             diurnal, annual, mean_temp, config,
         )
         for method in METHODS
-        for depth in config.candidate_depths_m
+        for depth in depths
     ]
     buildable = [
         option
