@@ -130,4 +130,24 @@ data and a geotechnical model of overburden and drilling, not a rewrite.
 | Browser or projector fails | `python -m marswater.cli` — full argument, ~8 s, text only |
 | App is slow or stuck | Reload once; the model is cached after first load |
 | 3D looks wrong on the projector | Switch to the **Flat map** tab; same data, 2D |
+| An `AttributeError` appears after you edit code | A stale server is serving old modules — see below |
 | Asked for code mid-demo | `marswater/physics.py` for the physics, `model.py` for the one model |
+
+### Restarting cleanly
+
+Streamlit reruns `app.py` on save but does not always reload changed classes in
+imported modules, so editing a dataclass and refreshing can leave you looking
+at an error that no longer exists in the code. Worse, `Ctrl-C` on a piped
+`streamlit run ... | tail` kills the pipe rather than the server, and the next
+`streamlit run` then fails silently on the busy port while the old process
+keeps serving. Verify the restart actually happened:
+
+```bash
+pkill -f "streamlit run"; sleep 3
+pgrep -f "streamlit run" || echo "stopped"     # must print: stopped
+streamlit run app.py
+```
+
+If an error persists after a genuine restart, it is real. Confirm with
+`pytest -q tests/test_app.py`, which executes the dashboard in-process against
+the code on disk and cannot be fooled by a stale server.
