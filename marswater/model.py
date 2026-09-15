@@ -141,11 +141,21 @@ class WaterYieldModel:
         return self
 
     # -- inference --------------------------------------------------------
+    #: Even nominally dry Martian regolith carries some chemically bound water
+    #: in sulphates and clays, so the water field is floored rather than zero.
+    #: Predictions and their bounds share this floor so the bounds always
+    #: bracket the prediction.
+    MIN_PHYSICAL_WEH_WT_PCT = 0.5
+
     def predict(self, sites: pd.DataFrame) -> np.ndarray:
         """Predicted water-equivalent hydrogen, weight percent."""
         if not self._fitted:
             raise RuntimeError("call fit() before predict()")
-        return np.clip(self.estimator.predict(sites[list(FEATURE_COLUMNS)]), 0.1, None)
+        return np.clip(
+            self.estimator.predict(sites[list(FEATURE_COLUMNS)]),
+            self.MIN_PHYSICAL_WEH_WT_PCT,
+            None,
+        )
 
     def predict_with_uncertainty(
         self, sites: pd.DataFrame, confidence_sigma: float = 1.0
@@ -163,13 +173,12 @@ class WaterYieldModel:
 
         mean = self.predict(sites)
         sigma = self.report.residual_std * confidence_sigma
-        # Floored at the same 0.5 wt% as the underlying water field: even
-        # nominally dry Martian regolith carries some chemically bound water,
-        # so a lower bound below that is not physically meaningful.
         return pd.DataFrame(
             {
                 "predicted_weh_wt_pct": mean,
-                "predicted_weh_lower_wt_pct": np.clip(mean - sigma, 0.5, None),
+                "predicted_weh_lower_wt_pct": np.clip(
+                    mean - sigma, self.MIN_PHYSICAL_WEH_WT_PCT, None
+                ),
                 "predicted_weh_upper_wt_pct": mean + sigma,
             },
             index=sites.index,
