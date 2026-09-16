@@ -153,6 +153,33 @@ pytest -q
 
 The CLI takes `--population`, `--fission-units`, `--top` and `--seed`.
 
+### Deploying it as a static page
+
+Streamlit needs a live Python process and a websocket, which serverless static
+hosts such as Vercel, GitHub Pages and Netlify do not provide. Everything the
+dashboard shows is a Plotly figure or a table computed from one seed, though,
+so a fixed slice of it exports to one self-contained page:
+
+```bash
+python export_static.py --clean   # writes site/index.html, about 12 seconds
+```
+
+The page keeps all seven 3D figures interactive — rotate, zoom, hover — and
+replaces the site selector with pre-rendered tabs for the recommended site and
+the driest and wettest sites on the shortlist, so the contrast between a mined
+vault and a trenched one survives the loss of the sliders. The sliders
+themselves do not survive; for those, run the Streamlit app.
+
+Deploy the directory to any static host. With Vercel:
+
+```bash
+npx vercel deploy --prod site
+```
+
+`vercel.json` also lets the repository root be imported directly into Vercel:
+it rebuilds the export at deploy time and falls back to the committed
+`site/index.html` if the Python build is unavailable in the build image.
+
 ## How the machine learning is used
 
 **One model, one decision.** A `GradientBoostingRegressor` predicts
