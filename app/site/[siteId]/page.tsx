@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { SiteInspect } from "@/components/site-inspect"
-import sitesPayload from "@/data/processed/sites_scored.json"
 import { NASA_AREA_BY_ID, NASA_SITE_IDS } from "@/lib/nasa-areas"
+import { scoredSiteById } from "@/lib/sites"
 
 type PageProps = {
   params: Promise<{ siteId: string }>
@@ -24,7 +24,7 @@ export const generateMetadata = async ({
       description: "Inspect a custom Mars landing pin.",
     }
   }
-  const site = sitesPayload.sites.find((item) => item.id === siteId)
+  const site = scoredSiteById(siteId)
   const area = NASA_AREA_BY_ID[siteId]
   return {
     title: `${site?.name ?? siteId} — Mars City`,
@@ -64,7 +64,7 @@ export default async function Page({ params, searchParams }: PageProps) {
     notFound()
   }
 
-  const site = sitesPayload.sites.find((item) => item.id === siteId)
+  const site = scoredSiteById(siteId)
   if (!site) {
     notFound()
   }
@@ -74,6 +74,7 @@ export default async function Page({ params, searchParams }: PageProps) {
       siteId={site.id}
       lat_deg={site.lat_deg}
       lon_east_deg={site.lon_east_deg}
+      initialSite={site}
     />
   )
 }

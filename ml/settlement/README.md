@@ -16,8 +16,15 @@ Already have the packs somewhere? `MARS_PACKS=/path/to/guided-packs python ml/se
 
 Needs the `ml/requirements.txt` env (pandas, scikit-learn, lightgbm, joblib).
 
-Then `pnpm dev` and open <http://localhost:3000/sol-zero-console/> for the presentation,
-or `/sol-zero-console/timeline.html` for the static timeline version.
+Then rebuild the compact file the Next.js inspect page reads:
+
+```bash
+node scripts/export-settlement-json.mjs
+```
+
+That writes `public/data/settlement.json` from `marsdata.js`. `pnpm dev`, then open a
+site such as <http://localhost:3000/site/jezero> for the main report, or
+<http://localhost:3000/sol-zero-console/> for the ten-card walkthrough.
 
 ## What is ML and what is not
 
@@ -31,7 +38,8 @@ sit on top of them.
 | `physics.py` | closed-form models | Beer–Lambert sky model, GCR dose vs regolith cover, thermal skin depth, overburden vs cabin pressure, wind dynamic pressure, storm battery bridge, demand budget. Every constant named |
 | `train_terrain_cost.py` | **ML decision 1** | LightGBM cell cost and hazard regressors on the 60×60 grid, a route success classifier on `routes.csv`, and Dijkstra over the *predicted* cost surface vs a naive straight line. Decides where to dig and how the haulers drive |
 | `train_storm_models.py` | **ML decision 2** | storm-mode detector from thermal / wind / pressure sensors only (no dust input), heating-load regressor, cabin CO2 regressor, next-day water makeup forecast. Decides whether a buried habitat can trip storm mode without an optical sensor |
-| `export_console_data.py` | data packaging | `marsdata.js` for the site |
+| `export_console_data.py` | data packaging | `marsdata.js` for the console |
+| `scripts/export-settlement-json.mjs` | data packaging | `public/data/settlement.json` for the Next.js inspect page |
 | `fetch_packs.py` | data | shallow clone of the organiser repo |
 
 ## Results (5-fold CV, 15 Sept 2026)

@@ -1,4 +1,4 @@
-import type { MarsCave } from "@/lib/mars-caves"
+import { BEST_CAVE_ID, type MarsCave } from "@/lib/mars-caves"
 
 /** MSL RAD surface GCR dose at Gale (−4.4 km). Hassler et al. 2014. */
 export const RAD_SURFACE_DOSE_MSV_PER_DAY = 0.64
@@ -149,8 +149,8 @@ export const geothermalGainK = (depthM: number) => {
 
 export const caveVerdict = (
   caves: MarsCave[],
-  lat: number,
-  lonEast: number,
+  _lat: number,
+  _lonEast: number,
   coverM: number,
 ): CaveVerdict => {
   if (caves.length === 0) {
@@ -162,15 +162,13 @@ export const caveVerdict = (
     }
   }
 
-  let nearest = caves[0]
-  let nearestKm = Infinity
-  for (const cave of caves) {
-    const km = haversineKm(lat, lonEast, cave.lat_deg, cave.lon_east_deg)
-    if (km < nearestKm) {
-      nearest = cave
-      nearestKm = km
-    }
-  }
+  const namedBest = caves.find((cave) => cave.id === BEST_CAVE_ID)
+  const deepest = caves.reduce((winner, cave) => {
+    const depth = cave.min_depth_m ?? -1
+    const bestDepth = winner.min_depth_m ?? -1
+    return depth > bestDepth ? cave : winner
+  }, caves[0])
+  const nearest = namedBest ?? deepest
 
   if (nearest.min_depth_m == null) {
     return {

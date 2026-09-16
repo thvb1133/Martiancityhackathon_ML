@@ -136,6 +136,8 @@ export const NASA_AREA_BY_ID = Object.fromEntries(
 
 export const NASA_SITE_IDS = NASA_AREAS.map((area) => area.siteId)
 
+export const BEST_SITE_ID = "arsia"
+
 export const ROLE_LABEL: Record<NasaAreaRole, string> = {
   landed: "NASA landed",
   human_ez: "Human exploration zone",

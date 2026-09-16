@@ -1,15 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import dynamic from "next/dynamic"
+import { useEffect, useMemo, useState, type ComponentType } from "react"
 import { useRouter } from "next/navigation"
 
 import { MarsMap2D } from "@/components/mars-map-2d"
-import {
-  AREA_GROUPS,
-  NASA_SITE_IDS,
-  ROLE_DOT,
-} from "@/lib/nasa-areas"
+import type { MarsGlobeProps } from "@/components/mars-globe"
+import { AREA_GROUPS, NASA_SITE_IDS, ROLE_DOT } from "@/lib/nasa-areas"
 import {
   JEZERO,
   customSiteHref,
@@ -18,29 +14,19 @@ import {
   type LandingPick,
   type LandingSite,
 } from "@/lib/mars-landing"
-
-const MarsGlobe = dynamic(
-  () => import("@/components/mars-globe").then((mod) => mod.MarsGlobe),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-full items-center justify-center text-sm text-stone-400">
-        Loading Mars…
-      </div>
-    ),
-  },
-)
+import { cn } from "@/lib/utils"
 
 export const LandingPicker = () => {
   const router = useRouter()
   const [sites, setSites] = useState<LandingSite[]>([])
   const [customSites, setCustomSites] = useState<CustomSite[]>([])
   const [pick, setPick] = useState<LandingPick>(JEZERO)
-  const [engine, setEngine] = useState<"cesium" | "fallback">("cesium")
+  const [Globe, setGlobe] = useState<ComponentType<MarsGlobeProps> | null>(null)
+  const [globeReady, setGlobeReady] = useState(false)
 
   const nasaSites = useMemo(
     () => sites.filter((site) => NASA_SITE_IDS.includes(site.id)),
-    [sites],
+    [sites]
   )
 
   const handleInspect = (next: LandingPick) => {
@@ -51,8 +37,13 @@ export const LandingPicker = () => {
     router.push(siteHref(next.siteId, next.lat_deg, next.lon_east_deg))
   }
 
+  const handleGlobeReady = () => {
+    setGlobeReady(true)
+  }
+
   const handleFail = () => {
-    setEngine("fallback")
+    setGlobe(null)
+    setGlobeReady(false)
   }
 
   const handleCustomAdd = (lat_deg: number, lon_east_deg: number) => {
@@ -75,31 +66,55 @@ export const LandingPicker = () => {
     void handleLoad()
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void import("@/components/mars-globe")
+        .then((mod) => {
+          if (cancelled) {
+            return
+          }
+          setGlobe(() => mod.MarsGlobe)
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setGlobe(null)
+          }
+        })
+    }, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [])
+
   return (
     <div className="relative min-h-svh bg-[#140c08] text-stone-100">
       <div
         className="absolute inset-0"
         role="application"
-        aria-label="Mars map of NASA landing areas. Click a label to inspect. Long-press to add a custom site."
+        aria-label="Mars map of NASA landing areas and cave pits. Click a label or cave to inspect. Long-press to add a custom site."
       >
-        {engine === "cesium" ? (
-          <MarsGlobe
-            pick={pick}
-            sites={nasaSites}
-            customSites={customSites}
-            onPick={handleInspect}
-            onCustomAdd={handleCustomAdd}
-            onFail={handleFail}
-          />
-        ) : (
-          <MarsMap2D
-            pick={pick}
-            sites={nasaSites}
-            customSites={customSites}
-            onPick={handleInspect}
-            onCustomAdd={handleCustomAdd}
-          />
-        )}
+        <MarsMap2D
+          pick={pick}
+          sites={nasaSites}
+          customSites={customSites}
+          onPick={handleInspect}
+          onCustomAdd={handleCustomAdd}
+        />
+        {Globe ? (
+          <div className={cn("absolute inset-0", !globeReady && "invisible")}>
+            <Globe
+              pick={pick}
+              sites={nasaSites}
+              customSites={customSites}
+              onPick={handleInspect}
+              onCustomAdd={handleCustomAdd}
+              onReady={handleGlobeReady}
+              onFail={handleFail}
+            />
+          </div>
+        ) : null}
       </div>
 
       <header className="pointer-events-none absolute inset-x-0 top-0 z-10 p-4 sm:p-6">
@@ -121,8 +136,8 @@ export const LandingPicker = () => {
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-[11px] text-stone-500">
-            Click a label to inspect. Long-press empty ground to add a site.
+          <p className="mt-2 text-[11px] text-stone-400">
+            100 people · 730 sols · storm 180–260. Teal is Arsia / Annie.
           </p>
         </div>
       </aside>

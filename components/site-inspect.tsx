@@ -6,17 +6,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { SiteReport } from "@/components/site-report"
-import { cavesNear } from "@/lib/mars-caves"
+import { caveFact, cavesNear, nearestCave } from "@/lib/mars-caves"
 import {
   formatLatLon,
   type LandingPick,
   type LandingSite,
 } from "@/lib/mars-landing"
-import {
-  loadMola4ppd,
-  sampleMolaBilinear,
-} from "@/lib/mola-heightmap"
-import { NASA_AREA_BY_ID } from "@/lib/nasa-areas"
+import { loadMola4ppd, sampleMolaBilinear } from "@/lib/mola-heightmap"
 
 const SiteTerrain = dynamic(
   () => import("@/components/site-terrain").then((mod) => mod.SiteTerrain),
@@ -27,33 +23,61 @@ const SiteTerrain = dynamic(
         Building terrain…
       </div>
     ),
-  },
+  }
 )
 
 export type SiteInspectProps = {
   siteId: string
   lat_deg: number
   lon_east_deg: number
+  initialSite?: LandingSite
 }
 
 export const SiteInspect = ({
   siteId,
   lat_deg,
   lon_east_deg,
+  initialSite,
 }: SiteInspectProps) => {
   const router = useRouter()
-  const [site, setSite] = useState<LandingSite>()
-  const [elevationM, setElevationM] = useState<number | null>(null)
+  const [site, setSite] = useState<LandingSite | undefined>(initialSite)
+  const [elevationM, setElevationM] = useState<number | null>(
+    initialSite?.elevation_m ?? null
+  )
   const pick = useMemo<LandingPick>(
     () => ({ lat_deg, lon_east_deg, siteId }),
-    [lat_deg, lon_east_deg, siteId],
+    [lat_deg, lon_east_deg, siteId]
   )
   const nearbyCaves = useMemo(
     () => cavesNear(lat_deg, lon_east_deg, 4),
-    [lat_deg, lon_east_deg],
+    [lat_deg, lon_east_deg]
   )
+  const namedCave = useMemo(
+    () => nearestCave(lat_deg, lon_east_deg),
+    [lat_deg, lon_east_deg]
+  )
+  const reportSite = useMemo<LandingSite | undefined>(() => {
+    if (!namedCave) {
+      return site
+    }
+    return {
+      id: namedCave.id,
+      name: namedCave.name,
+      lat_deg: namedCave.lat_deg,
+      lon_east_deg: namedCave.lon_east_deg,
+      archetype: "lava_tube",
+      why_it_matters: caveFact(namedCave),
+      tracks: "architecture",
+      elevation_m: site?.elevation_m ?? null,
+      slope_deg_local: site?.slope_deg_local ?? null,
+      ice_0_1m: site?.ice_0_1m ?? null,
+      ice_1_5m: site?.ice_1_5m ?? null,
+      ice_gt_5m: site?.ice_gt_5m ?? null,
+    }
+  }, [namedCave, site])
   const isCustom = siteId === "custom"
-  const area = NASA_AREA_BY_ID[siteId]
+  const title =
+    namedCave?.name ?? site?.name ?? (isCustom ? "Custom site" : "Site")
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -97,7 +121,7 @@ export const SiteInspect = ({
 
   return (
     <div className="relative min-h-svh bg-[#140c08] text-stone-100">
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 lg:left-[28rem]">
         <SiteTerrain
           lat_deg={lat_deg}
           lon_east_deg={lon_east_deg}
@@ -105,32 +129,36 @@ export const SiteInspect = ({
         />
       </div>
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 p-4 sm:p-6">
-        <h1 className="text-xl font-medium tracking-tight sm:text-2xl">
-          {site?.name ?? (isCustom ? "Custom site" : area ? siteId : "Site")}
-        </h1>
-      </header>
-
-      <aside className="pointer-events-none absolute bottom-0 left-0 z-30 w-full p-4 sm:max-w-md sm:p-6">
-        <div className="pointer-events-auto max-h-[60svh] overflow-y-auto rounded-lg bg-black/70 p-4 backdrop-blur-sm">
-          <div className="flex items-start justify-between gap-3">
-            <p className="font-mono text-sm">
+      <aside
+        className="absolute inset-x-0 bottom-0 z-30 max-h-[62vh] overflow-y-auto overscroll-contain bg-gradient-to-t from-[#140c08] via-[#140c08]/95 to-[#140c08]/80 p-4 sm:p-6 lg:inset-y-0 lg:right-auto lg:left-0 lg:max-h-none lg:w-[28rem] lg:bg-[#140c08]"
+        aria-label="Site analysis"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-medium tracking-tight sm:text-2xl">
+              {title}
+            </h1>
+            <p className="mt-1 font-mono text-sm text-stone-400">
               {formatLatLon(lat_deg, lon_east_deg)}
             </p>
-            <Link
-              href="/"
-              className="text-sm text-stone-300 underline-offset-2 hover:underline"
-            >
-              Back to map
-            </Link>
           </div>
-          <SiteReport
-            site={site}
-            pick={pick}
-            elevationM={site?.elevation_m ?? elevationM}
-            caves={nearbyCaves}
-          />
+          <Link
+            href="/"
+            className="shrink-0 pt-1 text-sm text-stone-300 underline-offset-2 hover:underline"
+            onClick={(event) => {
+              event.preventDefault()
+              router.push("/")
+            }}
+          >
+            Map
+          </Link>
         </div>
+        <SiteReport
+          site={reportSite}
+          pick={pick}
+          elevationM={elevationM ?? site?.elevation_m ?? null}
+          caves={nearbyCaves}
+        />
       </aside>
     </div>
   )

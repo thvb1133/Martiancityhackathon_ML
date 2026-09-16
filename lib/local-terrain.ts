@@ -1,20 +1,35 @@
 import { sampleMolaBilinear, type MolaGrid } from "@/lib/mola-heightmap"
-import type { MarsCave } from "@/lib/mars-caves"
+import { BEST_CAVE_ID, type MarsCave } from "@/lib/mars-caves"
 
 export const TERRAIN_CELLS = 192
-export const TERRAIN_SPAN_DEG = 5.2
+export const TERRAIN_SPAN_DEG = 2.2
+export const CAVE_FRAME_DEG = 1.25
+
+export const cavesInFrame = (
+  caves: MarsCave[],
+  lat0: number,
+  lonEast0: number,
+  maxDeg = CAVE_FRAME_DEG,
+) => {
+  return caves.filter((cave) => {
+    const dlat = cave.lat_deg - lat0
+    const dlon = ((cave.lon_east_deg - lonEast0 + 540) % 360) - 180
+    return Math.hypot(dlat, dlon) <= maxDeg
+  })
+}
 
 export const spanForCaves = (caves: MarsCave[], lat0: number, lonEast0: number) => {
-  if (caves.length === 0) {
+  const local = cavesInFrame(caves, lat0, lonEast0)
+  if (local.length === 0) {
     return TERRAIN_SPAN_DEG
   }
-  let span = TERRAIN_SPAN_DEG
-  for (const cave of caves) {
+  let span = 0.7
+  for (const cave of local) {
     const dlat = Math.abs(cave.lat_deg - lat0)
     const dlon = Math.abs(((cave.lon_east_deg - lonEast0 + 540) % 360) - 180)
-    span = Math.max(span, (dlat + 0.8) * 2, (dlon + 0.8) * 2)
+    span = Math.max(span, (dlat + 0.28) * 2, (dlon + 0.28) * 2)
   }
-  return Math.min(span, 8)
+  return Math.min(span, 2.6)
 }
 
 export type CaveMarker = {
@@ -24,6 +39,26 @@ export type CaveMarker = {
   y: number
   z: number
   radiusM: number
+  depthM: number
+  roomRM: number
+  best: boolean
+}
+
+export type HabitatBox = {
+  x: number
+  y: number
+  z: number
+  sx: number
+  sy: number
+  sz: number
+  kind: "hub" | "wing" | "link" | "shaft"
+}
+
+export type HabitatPlan = {
+  boxes: HabitatBox[]
+  focusX: number
+  focusY: number
+  focusZ: number
 }
 
 export type LocalTerrain = {
@@ -33,6 +68,82 @@ export type LocalTerrain = {
   minH: number
   maxH: number
   caves: CaveMarker[]
+  habitat: HabitatPlan
+}
+
+export const layoutHabitat = (
+  spanM: number,
+  surfaceY: number,
+  caves: CaveMarker[],
+): HabitatPlan => {
+  const unit = spanM * 0.016
+  let cx = 0
+  let cz = 0
+  let surface = surfaceY
+  let bury = Math.max(spanM * 0.02, unit * 1.3)
+  if (caves.length > 0) {
+    const home =
+      caves.find((cave) => cave.best) ??
+      caves.reduce((winner, cave) =>
+        cave.roomRM > winner.roomRM ? cave : winner,
+      )
+    cx = home.x
+    cz = home.z
+    surface = home.y
+    bury = home.depthM * 0.82
+  }
+  const floorY = surface - bury
+  const hubH = unit * 0.72
+  const wingH = unit * 0.55
+  const linkH = unit * 0.28
+  const boxes: HabitatBox[] = [
+    {
+      x: cx,
+      y: floorY + hubH / 2,
+      z: cz,
+      sx: unit * 1.7,
+      sy: hubH,
+      sz: unit * 1.7,
+      kind: "hub",
+    },
+  ]
+  const wings = [
+    { dx: unit * 2.5, dz: 0, sx: unit * 2.3, sz: unit * 0.72 },
+    { dx: -unit * 2.5, dz: 0, sx: unit * 2.3, sz: unit * 0.72 },
+    { dx: 0, dz: unit * 2.2, sx: unit * 0.72, sz: unit * 1.9 },
+    { dx: 0, dz: -unit * 2.2, sx: unit * 0.72, sz: unit * 1.9 },
+  ]
+  for (const wing of wings) {
+    boxes.push({
+      x: cx + wing.dx,
+      y: floorY + wingH / 2,
+      z: cz + wing.dz,
+      sx: wing.sx,
+      sy: wingH,
+      sz: wing.sz,
+      kind: "wing",
+    })
+    boxes.push({
+      x: cx + wing.dx * 0.48,
+      y: floorY + linkH / 2,
+      z: cz + wing.dz * 0.48,
+      sx: wing.dx !== 0 ? unit * 0.95 : unit * 0.3,
+      sy: linkH,
+      sz: wing.dz !== 0 ? unit * 0.95 : unit * 0.3,
+      kind: "link",
+    })
+  }
+  const shaftH = bury + hubH
+  boxes.push({
+    x: cx + unit * 0.85,
+    y: floorY + shaftH / 2,
+    z: cz + unit * 0.85,
+    sx: unit * 0.24,
+    sy: shaftH,
+    sz: unit * 0.24,
+    kind: "shaft",
+  })
+  return { boxes, focusX: cx, focusY: floorY + hubH / 2, focusZ: cz }
 }
 
 const hash2 = (x: number, y: number) => {
@@ -98,6 +209,7 @@ export const buildLocalTerrain = (
   caves: MarsCave[],
 ): LocalTerrain => {
   const cells = TERRAIN_CELLS
+  const localCaves = cavesInFrame(caves, lat0, lonEast0)
   const spanDeg = spanForCaves(caves, lat0, lonEast0)
   const heights = new Float32Array((cells + 1) * (cells + 1))
   const caveMask = new Float32Array(heights.length)
@@ -114,16 +226,16 @@ export const buildLocalTerrain = (
       h += fbm(lon * 14, lat * 14) * 55
       h += fbm(lon * 40, lat * 40) * 18
       let caveAmt = 0
-      for (const cave of caves) {
+      for (const cave of localCaves) {
         const dlat = (lat - cave.lat_deg) * metresPerDeg
         const dlon = ((lon - cave.lon_east_deg + 540) % 360) - 180
         const dx = dlon * metresPerDeg
         const dist = Math.hypot(dlat, dx)
-        const radius = Math.max(900, cave.diameter_m * 6)
+        const radius = Math.max(400, cave.diameter_m * 3)
         if (dist < radius) {
           const t = 1 - dist / radius
           const bowl = t * t * (3 - 2 * t)
-          const depth = Math.max(cave.min_depth_m ?? 80, 180) * 4
+          const depth = Math.max(cave.min_depth_m ?? 80, 80) * 2
           h -= depth * bowl
           caveAmt = Math.max(caveAmt, bowl)
         }
@@ -173,7 +285,7 @@ export const buildLocalTerrain = (
     }
   }
 
-  const caveMarkers: CaveMarker[] = caves.map((cave) => {
+  const caveMarkers: CaveMarker[] = localCaves.map((cave) => {
     const x =
       (((cave.lon_east_deg - lonEast0 + 540) % 360) - 180) * metresPerDeg
     const z = (lat0 - cave.lat_deg) * metresPerDeg
@@ -186,15 +298,28 @@ export const buildLocalTerrain = (
       Math.max(0, Math.round(((z / spanM) + 0.5) * cells)),
     )
     const i = row * (cells + 1) + col
+    const surfaceY = (heights[i] - mid) * exaggerate
+    const depthM = Math.max(
+      (cave.min_depth_m ?? 80) * exaggerate * 2.4,
+      spanM * 0.028,
+    )
     return {
       id: cave.id,
       name: cave.name,
       x,
-      y: (heights[i] - mid) * exaggerate + 80,
+      y: surfaceY,
       z,
-      radiusM: Math.max(cave.diameter_m * 4, spanM * 0.016),
+      radiusM: Math.max(cave.diameter_m * 2.4, spanM * 0.01),
+      depthM,
+      roomRM: Math.max(cave.diameter_m * 7, spanM * 0.02),
+      best: cave.id === BEST_CAVE_ID,
     }
   })
 
-  return { positions, colors, spanM, minH, maxH, caves: caveMarkers }
+  const midCell = Math.floor(cells / 2)
+  const midIndex = midCell * (cells + 1) + midCell
+  const surfaceY = (heights[midIndex] - mid) * exaggerate
+  const habitat = layoutHabitat(spanM, surfaceY, caveMarkers)
+
+  return { positions, colors, spanM, minH, maxH, caves: caveMarkers, habitat }
 }

@@ -21,7 +21,6 @@ import {
   ScreenSpaceCameraController,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
-  SingleTileImageryProvider,
   SkyAtmosphere,
   UrlTemplateImageryProvider,
   Viewer,
@@ -30,8 +29,20 @@ import "cesium/Build/Cesium/Widgets/widgets.css"
 
 import { SiteMark } from "@/components/site-mark"
 import { loadMola4ppd, sampleMolaBilinear } from "@/lib/mola-heightmap"
-import { MARS_CAVES } from "@/lib/mars-caves"
-import { NASA_AREA_BY_ID, type NasaAreaRole } from "@/lib/nasa-areas"
+import {
+  caveDistanceDeg,
+  caveEntityId,
+  BEST_CAVE_ID,
+  caveFact,
+  caveIdFromEntity,
+  pinDistanceDeg,
+  MARS_CAVES,
+} from "@/lib/mars-caves"
+import {
+  BEST_SITE_ID,
+  NASA_AREA_BY_ID,
+  type NasaAreaRole,
+} from "@/lib/nasa-areas"
 import {
   customSiteHref,
   lon180ToEast,
@@ -49,6 +60,7 @@ export type MarsGlobeProps = {
   customSites: CustomSite[]
   onPick: (next: LandingPick) => void
   onCustomAdd: (lat_deg: number, lon_east_deg: number) => void
+  onReady?: () => void
   onFail?: () => void
 }
 
@@ -69,6 +81,8 @@ type ScreenMark = {
   lat_deg: number
   lon_east_deg: number
   role: NasaAreaRole | "custom"
+  compact?: boolean
+  recommended?: boolean
 }
 const VIKING_TILES =
   "https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg"
@@ -215,23 +229,15 @@ const syncEntities = (
   }
 
   for (const cave of MARS_CAVES) {
-    viewer.entities.add({
-      id: `cave-${cave.id}`,
-      name: cave.name,
-      position: Cartesian3.fromDegrees(
-        lonEastTo180(cave.lon_east_deg),
-        cave.lat_deg,
-        SITE_HEIGHT_M,
-      ),
-      point: {
-        pixelSize: 5,
-        color: Color.fromCssColorString("#7de0c6"),
-        outlineColor: Color.BLACK,
-        outlineWidth: 1,
-        heightReference: HeightReference.CLAMP_TO_GROUND,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-    })
+    addTooltip(
+      viewer,
+      caveEntityId(cave.id),
+      cave.name,
+      cave.lat_deg,
+      cave.lon_east_deg,
+      caveDistanceDeg(cave, pick.lat_deg, pick.lon_east_deg) < 0.08,
+      "cave",
+    )
   }
 }
 
@@ -248,7 +254,7 @@ const entitySiteId = (
     return id.slice(5)
   }
   if (id.startsWith("cave-")) {
-    return "arsia"
+    return id
   }
   if (sites.some((site) => site.id === id)) {
     return id
@@ -299,6 +305,9 @@ const siteAtScreen = (
   for (const site of customSites) {
     consider(site.id, site.lat_deg, site.lon_east_deg)
   }
+  for (const cave of MARS_CAVES) {
+    consider(caveEntityId(cave.id), cave.lat_deg, cave.lon_east_deg)
+  }
   return nearest?.id
 }
 
@@ -308,6 +317,7 @@ export const MarsGlobe = ({
   customSites,
   onPick,
   onCustomAdd,
+  onReady,
   onFail,
 }: MarsGlobeProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -317,6 +327,7 @@ export const MarsGlobe = ({
   const customRef = useRef(customSites)
   const onPickRef = useRef(onPick)
   const onCustomAddRef = useRef(onCustomAdd)
+  const onReadyRef = useRef(onReady)
   const onFailRef = useRef(onFail)
   const viewerRef = useRef<Viewer | null>(null)
   const marksKeyRef = useRef("")
@@ -375,6 +386,8 @@ export const MarsGlobe = ({
         lat_deg: lat,
         lon_east_deg: lonEast,
         role,
+        recommended:
+          id === BEST_SITE_ID || id === caveEntityId(BEST_CAVE_ID),
       })
     }
     for (const site of sitesRef.current) {
@@ -400,8 +413,36 @@ export const MarsGlobe = ({
         "custom",
       )
     }
+    for (const cave of MARS_CAVES) {
+      push(
+        caveEntityId(cave.id),
+        cave.name,
+        cave.lat_deg,
+        cave.lon_east_deg,
+        customSiteHref(cave.lat_deg, cave.lon_east_deg),
+        caveFact(cave),
+        "cave_shelter",
+      )
+    }
+    const caveMarks = next.filter((mark) => mark.role === "cave_shelter")
+    const cavesClustered = caveMarks.some((left, index) =>
+      caveMarks.some(
+        (right, other) =>
+          index < other && Math.hypot(left.x - right.x, left.y - right.y) < 36,
+      ),
+    )
+    if (cavesClustered) {
+      for (const mark of next) {
+        if (mark.role === "cave_shelter" && !mark.recommended) {
+          mark.compact = true
+        }
+      }
+    }
     const key = next
-      .map((mark) => `${mark.id}:${Math.round(mark.x)}:${Math.round(mark.y)}`)
+      .map(
+        (mark) =>
+          `${mark.id}:${Math.round(mark.x)}:${Math.round(mark.y)}:${mark.compact ? "c" : "n"}`,
+      )
       .join("|")
     if (key === marksKeyRef.current) {
       return
@@ -416,8 +457,9 @@ export const MarsGlobe = ({
     customRef.current = customSites
     onPickRef.current = onPick
     onCustomAddRef.current = onCustomAdd
+    onReadyRef.current = onReady
     onFailRef.current = onFail
-  }, [pick, sites, customSites, onPick, onCustomAdd, onFail])
+  }, [pick, sites, customSites, onPick, onCustomAdd, onReady, onFail])
 
   useEffect(() => {
     const viewer = viewerRef.current
@@ -483,18 +525,6 @@ export const MarsGlobe = ({
           },
         })
 
-        const fallback = await SingleTileImageryProvider.fromUrl(
-          "/data/mars_viking_l2.jpg",
-          {
-            rectangle: Rectangle.fromDegrees(-180, -90, 180, 90),
-            ellipsoid: Ellipsoid.MARS,
-            credit: "Viking MDIM 2.1 browse · NASA / USGS",
-          },
-        )
-        if (disposed) {
-          return
-        }
-
         const trek = new UrlTemplateImageryProvider({
           url: VIKING_TILES,
           tilingScheme,
@@ -522,7 +552,7 @@ export const MarsGlobe = ({
           ellipsoid: Ellipsoid.MARS,
           terrainProvider,
           mapProjection: new GeographicProjection(Ellipsoid.MARS),
-          baseLayer: new ImageryLayer(fallback),
+          baseLayer: new ImageryLayer(trek),
           skyAtmosphere: new SkyAtmosphere(Ellipsoid.MARS),
           sceneMode: SceneMode.COLUMBUS_VIEW,
           msaaSamples: 4,
@@ -534,7 +564,6 @@ export const MarsGlobe = ({
           return
         }
 
-        viewer.imageryLayers.addImageryProvider(trek)
         viewer.scene.globe.baseColor = Color.fromCssColorString("#8a3a1c")
         viewer.scene.globe.enableLighting = false
         viewer.scene.globe.depthTestAgainstTerrain = true
@@ -578,6 +607,18 @@ export const MarsGlobe = ({
           )
           if (!pickedId) {
             return false
+          }
+          const caveId = caveIdFromEntity(pickedId)
+          const cave = caveId
+            ? MARS_CAVES.find((item) => item.id === caveId)
+            : undefined
+          if (cave) {
+            onPickRef.current({
+              lat_deg: cave.lat_deg,
+              lon_east_deg: cave.lon_east_deg,
+              siteId: "custom",
+            })
+            return true
           }
           const nasa = sitesRef.current.find((item) => item.id === pickedId)
           if (nasa) {
@@ -672,6 +713,7 @@ export const MarsGlobe = ({
         viewer.camera.setView({
           destination: WORLD_RECTANGLE,
         })
+        onReadyRef.current?.()
       } catch {
         onFailRef.current?.()
       }
@@ -701,7 +743,18 @@ export const MarsGlobe = ({
             lon_east_deg={mark.lon_east_deg}
             fact={mark.fact}
             role={mark.role}
-            selected={pick.siteId === mark.id}
+            compact={mark.compact}
+            recommended={mark.recommended}
+            selected={
+              mark.role === "cave_shelter"
+                ? pinDistanceDeg(
+                    mark.lat_deg,
+                    mark.lon_east_deg,
+                    pick.lat_deg,
+                    pick.lon_east_deg,
+                  ) < 0.08
+                : pick.siteId === mark.id
+            }
             className="absolute -translate-x-1/2 -translate-y-[calc(100%+6px)]"
             style={{ left: mark.x, top: mark.y }}
           />

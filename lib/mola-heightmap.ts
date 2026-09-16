@@ -13,12 +13,14 @@ export const loadMola4ppd = async (): Promise<MolaGrid> => {
     throw new Error("MOLA heightmap missing")
   }
   const buffer = await response.arrayBuffer()
-  const view = new DataView(buffer)
-  const count = buffer.byteLength / 2
+  const bytes = new Uint8Array(buffer)
+  const count = bytes.byteLength >> 1
   const elev = new Float32Array(count)
   for (let i = 0; i < count; i += 1) {
-    const raw = view.getInt16(i * 2, false)
-    elev[i] = raw === -32768 ? 0 : raw
+    const offset = i << 1
+    const raw = (bytes[offset] << 8) | bytes[offset + 1]
+    const signed = raw > 0x7fff ? raw - 0x10000 : raw
+    elev[i] = signed === -32768 ? 0 : signed
   }
   return { cols: COLS, rows: ROWS, elev }
 }

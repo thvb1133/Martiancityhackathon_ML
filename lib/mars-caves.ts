@@ -74,17 +74,69 @@ export const MARS_CAVES: MarsCave[] = [
   },
 ]
 
+export const BEST_CAVE_ID = "annie"
+
 export const CAVES_CREDIT =
   "Cushing et al. 2007, THEMIS skylights on Arsia Mons. Diameters 100–252 m. Floors stay in shadow, so depth is a minimum."
+
+export const caveEntityId = (caveId: string) => {
+  return `cave-${caveId}`
+}
+
+export const caveIdFromEntity = (entityId: string) => {
+  if (!entityId.startsWith("cave-")) {
+    return undefined
+  }
+  return entityId.slice(5)
+}
+
+export const pinDistanceDeg = (
+  latA: number,
+  lonEastA: number,
+  latB: number,
+  lonEastB: number,
+) => {
+  const dlat = latA - latB
+  const dlon = ((lonEastA - lonEastB + 540) % 360) - 180
+  return Math.hypot(dlat, dlon)
+}
+
+export const caveDistanceDeg = (
+  cave: MarsCave,
+  lat: number,
+  lonEast: number,
+) => {
+  return pinDistanceDeg(cave.lat_deg, cave.lon_east_deg, lat, lonEast)
+}
+
+export const caveFact = (cave: MarsCave) => {
+  if (cave.min_depth_m == null) {
+    return `${cave.host} skylight. Floor stays in shadow, so the roof is unknown. Measure before you skip the dirt pile.`
+  }
+  return `${cave.host} skylight. Roof ≥${cave.min_depth_m} m. That already beats the radiation pile. Live under the cave.`
+}
 
 export const cavesNear = (
   lat: number,
   lonEast: number,
   maxDeg = 4,
 ) => {
-  return MARS_CAVES.filter((cave) => {
-    const dlat = cave.lat_deg - lat
-    const dlon = ((cave.lon_east_deg - lonEast + 540) % 360) - 180
-    return Math.hypot(dlat, dlon) <= maxDeg
-  })
+  return MARS_CAVES.filter((cave) => caveDistanceDeg(cave, lat, lonEast) <= maxDeg)
+}
+
+export const nearestCave = (
+  lat: number,
+  lonEast: number,
+  maxDeg = 0.2,
+) => {
+  let best: MarsCave | undefined
+  let bestDist = maxDeg
+  for (const cave of MARS_CAVES) {
+    const dist = caveDistanceDeg(cave, lat, lonEast)
+    if (dist <= bestDist) {
+      best = cave
+      bestDist = dist
+    }
+  }
+  return best
 }

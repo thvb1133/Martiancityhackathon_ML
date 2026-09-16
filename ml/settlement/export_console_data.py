@@ -1,8 +1,12 @@
 """Pack the daily series the Sol Zero Console draws into marsdata.js.
 
-Writes public/sol-zero-console/marsdata.js. Everything the site animates
+Writes public/sol-zero-console/marsdata.js. Everything the console animates
 (solar curve, storm step, wind rose, terrain heatmap, cabin CO2) comes from
 here, so a change to the packs propagates to the demo.
+
+After this file updates, rebuild the Next.js inspect payload:
+
+    node scripts/export-settlement-json.mjs
 
 Run:  python ml/settlement/export_console_data.py
 """

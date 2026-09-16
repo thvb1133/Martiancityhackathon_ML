@@ -7,12 +7,12 @@ Event repo rules: public repo, last commit before **20:35**, README names the bu
 ## 1. What we shipped
 
 - Crew name / repo: `Mangle Kuo / https://github.com/ghcpuman902/mars-hackathon-2026`
-- One-sentence product: `Pick a NASA landing area, then read a site report that sizes radiation cover, quake tier, wind load, and thermal-stability depth for a 100-person first habitat.`
+- One-sentence product: `Pick a NASA landing area, then read a site report that sizes radiation cover, quake, wind, and burial depth, and shows the pack storm series, dig cost, and makeup water.`
 - **Track (pick one):**
   - [x] A Architecture
   - [ ] B Vehicles & Mobility
   - [ ] C Life Support & Resource Systems
-- One ML decision (better than a guess): `Rule-based tonight, not a trained model. Elevation, ice, and cave pits feed physics rules that output dig depth (m), quake tier, wind pressure (Pa), and annual skin depth — the numbers a crew uses to decide how much to bury vs build above ground.`
+- One ML decision (better than a guess): `Physics rules still size bury depth from elevation and ice. The inspect page also shows two learned pack decisions: a storm detector that trips sol 180 from wind and temperature (no dust sensor), and a terrain-cost surface that says dig on the plain (1.45 vs 3.02 Wh/m).`
   What the model or rule outputs, and what a human then builds or does with that output.
 - Non-goals (will not mention on stage): `Trained radiation or seismic models, a full cave catalog, geothermal power, simulated lava-tube clusters in the 3D mesh.`
 
@@ -28,11 +28,11 @@ See [official-packs.md](./official-packs.md). Discovery notes: [A](./track-a-ema
 
 | Used | Pack | Path | Real or simulated | What we took from it |
 | --- | --- | --- | --- | --- |
-| [x] | A EMARS weather | `data/raw/official-packs/extracted/track-a-architecture-emars/` | Simulated, EMARS-informed | `Hardcoded wind max / storm-median / clear-median and mean temperature from the Jezero hourly series` |
+| [x] | A EMARS weather | `data/raw/official-packs/extracted/track-a-architecture-emars/` | Simulated, EMARS-informed | `Hourly wind for pressure; daily solar, optical depth, and heating on the inspect sparkline` |
 | [ ] | B AI4MARS images | `.../track-b-vehicles-ai4mars/` images + labels | 48 real frames, 12 synth | `_` |
-| [ ] | B trip timetable | `.../logistics_duty_cycle_100p_730sol.csv` | Simulated | `_` |
-| [ ] | B2 mobility grid | `.../track-b2-mobility-ai4mars/` | Fully synthetic | `_` |
-| [ ] | C ECLSS log | `.../track-c-life-support-hre/` | Simulated, not Mars500 telemetry | `_` |
+| [x] | B trip timetable | `.../logistics_duty_cycle_100p_730sol.csv` | Simulated | `Storm vs clear terrain-risk means (0.50 → 0.73)` |
+| [x] | B2 mobility grid | `.../track-b2-mobility-ai4mars/` | Fully synthetic | `Plain vs rock energy and stall; planned vs naive haul` |
+| [x] | C ECLSS log | `.../track-c-life-support-hre/` | Simulated, not Mars500 telemetry | `Makeup water / O₂ and cabin CO₂, clear vs storm` |
 
 ### Open sandbox / local rasters
 
@@ -51,7 +51,7 @@ See [datasets.md](./datasets.md).
 
 One sentence. Example: "Weather and ECLSS tables are hack-ready simulations; the 48 rover frames are real AI4MARS, resized."
 
-Radiation, seismic, wind-load and thermal depths are physics rules with cited constants, not site measurements; wind is Track A simulated Jezero series.
+Radiation, seismic, wind-load and thermal depths are physics rules with cited constants, not site measurements. Weather, ECLSS, and the trip table are simulated. The B2 grid is synthetic. Storm-detector and terrain-cost scores recovered the generator.
 
 Citations go in the README. Copy from [official-source/CREDITS.txt](./official-source/CREDITS.txt) for any official pack you ticked.
 
@@ -94,5 +94,5 @@ Q&A: data honesty, feasibility, what you would do with another day.
 - [x] `LOCKS.md` or this file has track + data filled
 - [x] README updated
 - [x] Demo path works on a cold start
-- [ ] Commits staged and pushed
+- [x] Commits staged and pushed
 - [ ] Laptop on the demo URL, not the editor

@@ -30,6 +30,11 @@ export default function RootLayout({
       )}
     >
       <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `self.CESIUM_BASE_URL="/cesium/"`,
+          }}
+        />
         <ThemeProvider>
           <TooltipProvider>
             {children}
